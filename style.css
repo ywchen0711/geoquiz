@@ -87,3 +87,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .review span { color: var(--right); font-weight: 700; }
 .review small { color: var(--mute); }
 @media (max-width: 480px) { .opt { font-size: 16px; padding: 12px 6px; } .opts.n6, .flags.n6 { grid-template-columns: 1fr 1fr; } }
+.home { position: relative; }
+.langbtn { position: absolute; right: 0; top: 14px; border: 2px solid var(--line); background: #fff; border-radius: 20px; padding: 5px 14px; font-weight: 700; color: var(--brand); }
+.opt { line-height: 1.25; overflow-wrap: anywhere; }
+html:lang(en) body { font-family: 'Segoe UI', system-ui, -apple-system, Roboto, 'Noto Sans TC', sans-serif; }

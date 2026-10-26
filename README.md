@@ -1,6 +1,8 @@
 # 地理大挑戰
 
-地理問答遊戲：看地圖認國家、在地圖上點出國家、國旗、首都、台灣縣市和地理常識，有四個難度。
+地理問答遊戲：看地圖認國家、在地圖上點出國家、國旗、首都、台灣縣市和地理常識，有四個難度。有中文版和英文版（首頁右上角切換，或網址加 `?lang=en`）。
+
+A geography quiz in Chinese and English: maps, flags, capitals, Taiwan’s counties and general geography, at four levels. Switch the language at the top right of the home screen, or open it with `?lang=en`.
 
 **線上玩：** https://ywchen0711.github.io/geoquiz/
 
@@ -36,6 +38,8 @@
 ## 檔案
 
 - `js/data.js`：196 個國家（國名、首都、洲、知名度）、22 個縣市、地理常識題
+- `js/data_en.js`：上面這些的英文（國名、首都、縣市、景點、地理常識題）
+- `tools/test.mjs`：`node tools/test.mjs` 檢查中英文資料是否一一對應
 - `js/quiz.js`：出題（各難度的國家範圍、鄰國當錯誤選項）
 - `js/map.js`：用 d3-geo 畫世界地圖和台灣地圖
 - `js/app.js`：畫面

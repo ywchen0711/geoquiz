@@ -3,6 +3,9 @@
 import { ON_MAP, BIG } from './quiz.js';
 const d3 = window.d3, topojson = window.topojson;
 let WORLD = null, TWF = null;
+let lang = 'zh';
+export const setMapLang = (l) => { lang = l; };
+const INSET = { zh: { 連江縣: '連江', 金門縣: '金門' }, en: { 連江縣: 'Matsu', 金門縣: 'Kinmen' } };
 const W = 800;
 const tall = () => window.innerWidth < 560; // phones get a taller map, so the zoomed-in part is bigger
 // how far to zoom in for each continent (corners in longitude, latitude)
@@ -40,7 +43,7 @@ export function twSVG(o) {
   const pm = d3.geoMercator().fitExtent([[100, 12], [TWW - 12, TWH - 12]], { type: 'FeatureCollection', features: main });
   // the main islands of each, not every far-off islet
   const AREA = { 連江縣: [[119.86, 25.94], [120.32, 26.32]], 金門縣: [[118.2, 24.38], [118.5, 24.53]] };
-  const inset = (name, y) => { const fs = TWF.filter((f) => f.properties.COUNTYNAME === name), [a, b] = AREA[name]; const pj = d3.geoMercator().fitExtent([[12, y + 18], [92, y + 94]], { type: 'MultiPoint', coordinates: [a, b] }).clipExtent([[7, y + 1], [97, y + 99]]); return `<rect class="inset" x="6" y="${y}" width="92" height="100" rx="6"/><text x="52" y="${y + 14}" class="lbl">${name.slice(0, 2)}</text>${draw(fs, pj)}`; };
+  const inset = (name, y) => { const fs = TWF.filter((f) => f.properties.COUNTYNAME === name), [a, b] = AREA[name]; const pj = d3.geoMercator().fitExtent([[12, y + 18], [92, y + 94]], { type: 'MultiPoint', coordinates: [a, b] }).clipExtent([[7, y + 1], [97, y + 99]]); return `<rect class="inset" x="6" y="${y}" width="92" height="100" rx="6"/><text x="52" y="${y + 14}" class="lbl">${INSET[lang][name]}</text>${draw(fs, pj)}`; };
   // a ring around the small places, so they can be seen
   let ring = '';
   if (o.lit) { const f = TWF.find((x) => x.properties.COUNTYNAME === o.lit); if (f && main.includes(f)) { const path = d3.geoPath(pm); if (path.area(f) < 300) { const [x, y] = path.centroid(f); ring = `<circle class="ring" cx="${x}" cy="${y}" r="14"/>`; } } }

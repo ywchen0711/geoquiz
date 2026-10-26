@@ -1,29 +1,50 @@
-// 地理大挑戰: the screens. Pick a subject and a level, answer ten (or twenty) questions against the clock.
-import { LEVELS, TOPICS, makeQuiz } from './quiz.js';
-import { loadMaps, worldSVG, twSVG } from './map.js';
+// 地理大挑戰 / Geo Quiz: the screens, in Chinese or English. Pick a subject and a level, answer ten (or twenty)
+// questions against the clock.
+import { LEVELS, TOPICS, makeQuiz, setLang } from './quiz.js';
+import { loadMaps, worldSVG, twSVG, setMapLang } from './map.js';
 import { sfx, setMute, muted } from './sfx.js';
 
 const $ = (s, el = document) => el.querySelector(s), app = $('#app');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ls = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignore */ } } };
-const cfg = Object.assign({ topic: 'mix', lv: 0, n: 10 }, ls.get('geoquiz.cfg', {}));
+const firstLang = /^zh/i.test(navigator.language || '') ? 'zh' : 'en';
+const cfg = Object.assign({ topic: 'mix', lv: 0, n: 10, lang: firstLang }, ls.get('geoquiz.cfg', {}));
 const best = ls.get('geoquiz.best', {});
 let G = null, timer = 0;
 
+// ---------------------------------------------------------------- words
+const TXT = {
+  zh: { title: '地理大挑戰', sub: '世界地圖・國旗・首都・台灣縣市', what: '考什麼', level: '難度', best: '最佳', count: '題數', q: '題', start: '開始挑戰 ▶',
+    credit: '地圖資料：Natural Earth（world-atlas）、內政部（taiwan-atlas）；國旗：flag-icons。', loading: '🌍 載入地圖中…', fail: '地圖載入失敗：',
+    streak: (n) => `🔥 連對 ${n}`, right: (g) => `答對了！ +${g}`, timeUp: '時間到！', wrong: '答錯了', answer: '正確答案：', next: '下一題 ▶', see: '看成績',
+    points: (s) => `${s} 分`, summary: (t, l, r, n, b) => `${t}・${l}　答對 ${r} / ${n} 題・最多連對 ${b} 題`, record: '🎉 新紀錄！', bestWas: (p) => `最佳紀錄 ${p} 分`,
+    missed: '答錯的題目', perfect: '全部答對，太厲害了！', again: '再玩一次', change: '換題目 / 難度', other: 'English' },
+  en: { title: 'Geo Quiz', sub: 'World maps · flags · capitals · Taiwan', what: 'Subject', level: 'Level', best: 'Best', count: 'Questions', q: '', start: 'Start ▶',
+    credit: 'Maps: Natural Earth (world-atlas), Ministry of the Interior (taiwan-atlas). Flags: flag-icons.', loading: '🌍 Loading the maps…', fail: 'The maps could not be loaded: ',
+    streak: (n) => `🔥 ${n} in a row`, right: (g) => `Right! +${g}`, timeUp: 'Time’s up!', wrong: 'Not quite', answer: 'Answer: ', next: 'Next ▶', see: 'See results',
+    points: (s) => `${s} points`, summary: (t, l, r, n, b) => `${t} · ${l} — ${r} of ${n} right, best streak ${b}`, record: '🎉 New best!', bestWas: (p) => `Best so far: ${p}`,
+    missed: 'Questions you missed', perfect: 'All correct, brilliant!', again: 'Play again', change: 'Change subject / level', other: '中文' },
+};
+const T = () => TXT[cfg.lang];
+const tName = (x) => (cfg.lang === 'en' ? x.en : x.name), tNote = (x) => (cfg.lang === 'en' ? x.noteEn : x.note);
+function useLang() { setLang(cfg.lang); setMapLang(cfg.lang); document.documentElement.lang = cfg.lang === 'en' ? 'en' : 'zh-Hant'; document.title = T().title; }
+
 // ---------------------------------------------------------------- home
 function home() {
-  clearInterval(timer); G = null;
-  app.innerHTML = `<div class="home"><div class="title"><div class="globe">🌍</div><h1>地理大挑戰</h1><p>世界地圖・國旗・首都・台灣縣市</p></div>
-    <section class="card"><h2>考什麼</h2><div class="topics">${TOPICS.map((t) => `<button class="topic ${cfg.topic === t.id ? 'on' : ''}" data-topic="${t.id}"><span>${t.icon}</span><b>${t.name}</b><small>${t.note}</small></button>`).join('')}</div></section>
-    <section class="card"><h2>難度</h2><div class="levels">${LEVELS.map((L, i) => `<button class="lv lv${i} ${cfg.lv === i ? 'on' : ''}" data-lv="${i}"><b>${L.name}</b><small>${L.note}</small><i>最佳 ${best[cfg.topic + i] || 0}</i></button>`).join('')}</div>
-    <div class="row">題數 ${[10, 20, 30].map((n) => `<button class="pill ${cfg.n === n ? 'on' : ''}" data-n="${n}">${n} 題</button>`).join('')}</div></section>
-    <button class="go" data-act="start">開始挑戰 ▶</button>
-    <p class="foot">地圖資料：Natural Earth（world-atlas）、內政部（taiwan-atlas）；國旗：flag-icons。</p></div>`;
+  clearInterval(timer); G = null; useLang();
+  const t = T();
+  app.innerHTML = `<div class="home"><button class="langbtn" data-act="lang">🌐 ${t.other}</button>
+    <div class="title"><div class="globe">🌍</div><h1>${t.title}</h1><p>${t.sub}</p></div>
+    <section class="card"><h2>${t.what}</h2><div class="topics">${TOPICS.map((x) => `<button class="topic ${cfg.topic === x.id ? 'on' : ''}" data-topic="${x.id}"><span>${x.icon}</span><b>${tName(x)}</b><small>${tNote(x)}</small></button>`).join('')}</div></section>
+    <section class="card"><h2>${t.level}</h2><div class="levels">${LEVELS.map((L, i) => `<button class="lv lv${i} ${cfg.lv === i ? 'on' : ''}" data-lv="${i}"><b>${tName(L)}</b><small>${tNote(L)}</small><i>${t.best} ${best[cfg.topic + i] || 0}</i></button>`).join('')}</div>
+    <div class="row">${t.count} ${[10, 20, 30].map((n) => `<button class="pill ${cfg.n === n ? 'on' : ''}" data-n="${n}">${n}${t.q ? ' ' + t.q : ''}</button>`).join('')}</div></section>
+    <button class="go" data-act="start">${t.start}</button>
+    <p class="foot">${t.credit}</p></div>`;
 }
 
 // ---------------------------------------------------------------- a round
 function start() {
-  ls.set('geoquiz.cfg', cfg);
+  ls.set('geoquiz.cfg', cfg); useLang();
   const qs = makeQuiz(cfg.topic, cfg.lv, cfg.n);
   G = { qs, i: -1, score: 0, right: 0, streak: 0, bestStreak: 0, wrong: [], topic: cfg.topic, lv: cfg.lv };
   next();
@@ -31,12 +52,12 @@ function start() {
 function next() {
   G.i++;
   if (G.i >= G.qs.length) return results();
-  const q = G.qs[G.i], L = LEVELS[G.lv];
+  const q = G.qs[G.i], L = LEVELS[G.lv], t = T();
   G.t0 = Date.now(); G.done = false;
   app.innerHTML = `<div class="play"><header class="bar"><button class="x" data-act="home">✕</button><div class="prog"><i style="width:${G.i / G.qs.length * 100}%"></i></div>
       <span class="count">${G.i + 1}/${G.qs.length}</span><span class="score">⭐ ${G.score}</span><button class="x" data-act="mute">${muted() ? '🔇' : '🔊'}</button></header>
     <div class="timer"><i></i></div>
-    <div class="q card"><div class="tag">${L.name}${G.streak >= 2 ? ` <span class="streak">🔥 連對 ${G.streak}</span>` : ''}</div><h2>${esc(q.ask)}</h2><div class="show">${showOf(q)}</div>
+    <div class="q card"><div class="tag">${tName(L)}${G.streak >= 2 ? ` <span class="streak">${t.streak(G.streak)}</span>` : ''}</div><h2>${esc(q.ask)}</h2><div class="show">${showOf(q)}</div>
       <div class="opts n${q.opts ? q.opts.length : 0}">${q.opts ? q.opts.map((o) => `<button class="opt" data-o="${esc(o)}">${esc(o)}</button>`).join('') : ''}</div>
       ${q.flags ? `<div class="flags n${q.flags.length}">${q.flags.map((f) => `<button class="fl" data-o="${esc(f.name)}"><img src="flags/${f.a2}.svg" alt=""></button>`).join('')}</div>` : ''}
       <div class="feedback"></div></div></div>`;
@@ -61,7 +82,7 @@ function showOf(q) {
 function answer(pick, el) {
   if (G.done) return;
   G.done = true; clearInterval(timer);
-  const q = G.qs[G.i], L = LEVELS[G.lv], ok = pick != null && pick === q.ans, used = (Date.now() - G.t0) / 1000;
+  const q = G.qs[G.i], L = LEVELS[G.lv], t = T(), ok = pick != null && pick === q.ans, used = (Date.now() - G.t0) / 1000;
   let gain = 0;
   if (ok) { G.right++; G.streak++; G.bestStreak = Math.max(G.bestStreak, G.streak); gain = Math.round((100 + 100 * Math.max(0, 1 - used / q.time) + Math.min(5, G.streak - 1) * 20) * L.mult); G.score += gain; sfx('ok'); }
   else { G.streak = 0; G.wrong.push(q); sfx('bad'); }
@@ -73,22 +94,22 @@ function answer(pick, el) {
   }
   if (q.after) $('.show').innerHTML = q.after.map === 'tw' ? twSVG(q.after) : worldSVG(q.after);
   if (q.flags) app.querySelectorAll('.fl').forEach((b) => { b.insertAdjacentHTML('beforeend', `<small>${esc(b.dataset.o)}</small>`); });
-  $('.feedback').innerHTML = `<div class="${ok ? 'good' : 'bad'}">${ok ? `答對了！ +${gain}` : pick == null ? '時間到！' : '答錯了'}${!ok ? `　正確答案：<b>${esc(q.ansName || q.ans)}</b>` : ''}</div><p>${esc(q.info || '')}</p><button class="go small" data-act="next">${G.i + 1 < G.qs.length ? '下一題 ▶' : '看成績'}</button>`;
+  $('.feedback').innerHTML = `<div class="${ok ? 'good' : 'bad'}">${ok ? t.right(gain) : pick == null ? t.timeUp : t.wrong}${!ok ? `　${t.answer}<b>${esc(q.ansName || q.ans)}</b>` : ''}</div><p>${esc(q.info || '')}</p><button class="go small" data-act="next">${G.i + 1 < G.qs.length ? t.next : t.see}</button>`;
   $('.score').textContent = '⭐ ' + G.score;
 }
 
 // ---------------------------------------------------------------- the end of a round
 function results() {
-  const key = G.topic + G.lv, prev = best[key] || 0, isBest = G.score > prev;
+  const key = G.topic + G.lv, prev = best[key] || 0, isBest = G.score > prev, t = T();
   if (isBest) { best[key] = G.score; ls.set('geoquiz.best', best); }
   const pct = G.right / G.qs.length, stars = pct >= 0.9 ? 3 : pct >= 0.7 ? 2 : pct >= 0.4 ? 1 : 0;
   sfx(stars >= 2 ? 'win' : 'end');
-  const T = TOPICS.find((t) => t.id === G.topic);
+  const P = TOPICS.find((x) => x.id === G.topic);
   app.innerHTML = `<div class="home"><section class="card result"><div class="stars">${'⭐'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
-    <h1>${G.score} 分</h1><p>${T.icon} ${T.name}・${LEVELS[G.lv].name}　答對 ${G.right} / ${G.qs.length} 題・最多連對 ${G.bestStreak} 題</p>
-    ${isBest ? '<p class="nb">🎉 新紀錄！</p>' : `<p class="hint">最佳紀錄 ${prev} 分</p>`}
-    ${G.wrong.length ? `<h2>答錯的題目</h2><ul class="review">${G.wrong.map((q) => `<li><b>${esc(q.ask)}</b><span>${esc(q.ansName || q.ans)}</span><small>${esc(q.info || '')}</small></li>`).join('')}</ul>` : '<p class="nb">全部答對，太厲害了！</p>'}
-    <button class="go" data-act="start">再玩一次</button><button class="go ghost" data-act="home">換題目 / 難度</button></section></div>`;
+    <h1>${t.points(G.score)}</h1><p>${t.summary(`${P.icon} ${tName(P)}`, tName(LEVELS[G.lv]), G.right, G.qs.length, G.bestStreak)}</p>
+    ${isBest ? `<p class="nb">${t.record}</p>` : `<p class="hint">${t.bestWas(prev)}</p>`}
+    ${G.wrong.length ? `<h2>${t.missed}</h2><ul class="review">${G.wrong.map((q) => `<li><b>${esc(q.ask)}</b><span>${esc(q.ansName || q.ans)}</span><small>${esc(q.info || '')}</small></li>`).join('')}</ul>` : `<p class="nb">${t.perfect}</p>`}
+    <button class="go" data-act="start">${t.again}</button><button class="go ghost" data-act="home">${t.change}</button></section></div>`;
 }
 
 // ---------------------------------------------------------------- clicks
@@ -97,6 +118,7 @@ app.addEventListener('click', (e) => {
   if (b.dataset.topic) { cfg.topic = b.dataset.topic; ls.set('geoquiz.cfg', cfg); home(); }
   else if (b.dataset.lv) { cfg.lv = +b.dataset.lv; ls.set('geoquiz.cfg', cfg); home(); }
   else if (b.dataset.n) { cfg.n = +b.dataset.n; ls.set('geoquiz.cfg', cfg); home(); }
+  else if (b.dataset.act === 'lang') { cfg.lang = cfg.lang === 'en' ? 'zh' : 'en'; ls.set('geoquiz.cfg', cfg); home(); }
   else if (b.dataset.act === 'start') start();
   else if (b.dataset.act === 'next') next();
   else if (b.dataset.act === 'home') home();
@@ -109,6 +131,10 @@ document.addEventListener('keydown', (e) => {
   const bs = app.querySelectorAll('.opt, .fl'); bs[k]?.click();
 });
 
-app.innerHTML = '<div class="loading">🌍 載入地圖中…</div>';
-loadMaps().then(home, (e) => { app.innerHTML = `<div class="loading">地圖載入失敗：${esc(e.message)}</div>`; });
+// ?lang=en or ?lang=zh in the address picks the language
+const want = new URLSearchParams(location.search).get('lang');
+if (want === 'en' || want === 'zh') cfg.lang = want;
+useLang();
+app.innerHTML = `<div class="loading">${T().loading}</div>`;
+loadMaps().then(home, (e) => { app.innerHTML = `<div class="loading">${T().fail}${esc(e.message)}</div>`; });
 window.GQ = { get G() { return G; }, makeQuiz, cfg };
